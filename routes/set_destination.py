@@ -1,9 +1,10 @@
+from ros_node_manager import ros2_node_holder
 from flask import Blueprint, request, jsonify
 from utils.gps_dummy import get_dummy_gps
 from utils.tmap_api import get_route_from_tmap, get_coordinates_from_keyword
 from utils.tmap_parser import extract_coordinates, extract_detailed_route
 import json
-
+import time
 
 set_destination_bp = Blueprint('set_destination', __name__)
 
@@ -37,6 +38,25 @@ def set_destination():
     
     # 경로 좌표 추출
     route_coords = extract_coordinates(route_data)
+    
+    print("📌 route_coords:", json.dumps(route_coords, indent=2, ensure_ascii=False))
+    
+    # ROS2 노드가 초기화될 때까지 기다림 (최대 5초)
+    timeout = 5
+    while ros2_node_holder.node is None and timeout > 0:
+       print("⏳ Waiting for ROS2 node to be ready...")
+       time.sleep(0.5)
+       timeout -= 0.5
+
+    if ros2_node_holder.node:
+       ros2_node_holder.node.publish_route(route_coords)
+       print("✅ Published route to ROS2.")
+    else:
+       print("❌ ros2_node가 준비되지 않아서 publish 실패.")
+
+    #ROS2로 경로 publish
+    if ros2_node_holder:
+        ros2_node_holder.node.publish_route(route_coords)
     
     # 상세 경로 정보 추출
     detailed_route = extract_detailed_route(route_data)
